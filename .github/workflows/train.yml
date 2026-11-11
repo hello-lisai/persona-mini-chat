@@ -1,0 +1,47 @@
+name: Train persona model (CPU LoRA)
+
+on:
+  push:
+    branches: [main]
+    paths: ["data/**", "train.py", "test_chat.py", "requirements.txt"]
+  workflow_dispatch:
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip and HuggingFace model
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.cache/huggingface
+          key: hf-qwen06b-${{ runner.os }}-v1
+
+      - name: Install dependencies (CPU torch)
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt
+
+      - name: Train LoRA
+        run: python train.py
+
+      - name: Test chat (before vs after)
+        run: |
+          python test_chat.py 2>&1 | tee chat_report.txt
+
+      - name: Upload adapter and report
+        uses: actions/upload-artifact@v4
+        with:
+          name: persona-adapter-and-report
+          path: |
+            output/adapter/
+            chat_report.txt
+          retention-days: 90
